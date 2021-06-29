@@ -1,96 +1,99 @@
 #include "windows.h"
-#include "tools.h"
+#include  "rast.h"
 #define THREAD_COUNT 4 
+char info_log[512];
+Platform p;
+i32 YOffset;
 
-internal i32 Running;
 typedef struct win32_offscreen_buffer {
     BITMAPINFO Info;
-    void *Memory;
-    i32 Pitch;
-    i32 Width;
-    i32 Height;
-    i32 BytesPerPixel;
+    void *data;
+    i32 pitch;
+    i32 width;
+    i32 height;
+    i32 bytes_per_pixel;
 }win32_offscreen_buffer;
-internal win32_offscreen_buffer GlobalBackBuffer;
+internal win32_offscreen_buffer back_buffer;
 
-typedef struct win32_window_dimension
+typedef struct win32_WinDim
 {
-    i32 Width;
-    i32 Height;
-} win32_window_dimension;
+    i32 width;
+    i32 height;
+} win32_WinDim;
 
-win32_window_dimension GetWindowDimension(HWND Window)
+internal win32_WinDim win32_get_win_dim(HWND Window)
 {
-    win32_window_dimension dim;
+    win32_WinDim dim;
     RECT ClientRect;
     GetClientRect(Window,&ClientRect);
-    dim.Width = ClientRect.right - ClientRect.left;
-    dim.Height = ClientRect.bottom - ClientRect.top;
+    dim.width = ClientRect.right - ClientRect.left;
+    dim.height = ClientRect.bottom - ClientRect.top;
     
     return dim;
 }
-Win32ResizeDIBSection(win32_offscreen_buffer *Buffer,i32 Width, i32 Height)
+Win32ResizeDIBSection(win32_offscreen_buffer *buf,i32 width, i32 height)
 
 {
-    if(Buffer->Memory)
-
+    if(buf->data)
     {
 
-        VirtualFree(Buffer->Memory, 0, MEM_RELEASE);
+        VirtualFree(buf->data, 0, MEM_RELEASE);
 
     }
 
 
 
-    Buffer->Width = Width;
+    buf->width = width;
 
-    Buffer->Height = Height;
-    Buffer->BytesPerPixel = 4;
-
-
-
-    Buffer->Info.bmiHeader.biSize = sizeof(Buffer->Info.bmiHeader);
-
-    Buffer->Info.bmiHeader.biWidth = Buffer->Width;
-
-    Buffer->Info.bmiHeader.biHeight = -Buffer->Height;
-
-    Buffer->Info.bmiHeader.biPlanes = 1;
-
-    Buffer->Info.bmiHeader.biBitCount = 32;
-
-    Buffer->Info.bmiHeader.biCompression = BI_RGB;
+    buf->height = height;
+    buf->bytes_per_pixel = 4;
 
 
 
-	i32 BitmapMemorySize = Buffer->Width*Buffer->Height*Buffer->BytesPerPixel;
+    buf->Info.bmiHeader.biSize = sizeof(buf->Info.bmiHeader);
 
-	Buffer->Memory = VirtualAlloc(0, BitmapMemorySize, MEM_COMMIT|MEM_RESERVE, PAGE_READWRITE);
-    assert(Buffer->Memory);
-    Buffer->Pitch = Buffer->Width*Buffer->BytesPerPixel;
+    buf->Info.bmiHeader.biWidth = buf->width;
+
+    buf->Info.bmiHeader.biHeight = -buf->height;
+
+    buf->Info.bmiHeader.biPlanes = 1;
+
+    buf->Info.bmiHeader.biBitCount = 32;
+
+    buf->Info.bmiHeader.biCompression = BI_RGB;
+
+
+
+	i32 BitmapdataSize = buf->width*buf->height*buf->bytes_per_pixel;
+
+	buf->data = VirtualAlloc(0, BitmapdataSize, MEM_COMMIT|MEM_RESERVE, PAGE_READWRITE);
+    assert(buf->data);
+    buf->pitch = buf->width*buf->bytes_per_pixel;
 }
 
 
 
 
 LRESULT CALLBACK
-Win32MainWindowCallback(HWND Window, UINT Message, WPARAM WParam, LPARAM LParam)
+win32_callback(HWND Window, UINT msg, WPARAM w_param, LPARAM l_param)
 {
 
     LRESULT Result = 0;
     
-    switch(Message)
+    switch(msg)
     {
         case WM_SIZE:
         {
-            win32_window_dimension Dimension = GetWindowDimension(Window);
+            win32_WinDim dim = win32_get_win_dim(Window);
+            p.window_width = dim.width;
+            p.window_height = dim.height;
 
-            Win32ResizeDIBSection(&GlobalBackBuffer,Dimension.Width, Dimension.Height);
+            Win32ResizeDIBSection(&back_buffer,dim.width, dim.height);
 
         } break;
         case WM_CLOSE:
         {
-            Running = FALSE;
+            p.exit = FALSE;
         } break;
         case WM_ACTIVATEAPP:
 
@@ -102,135 +105,150 @@ Win32MainWindowCallback(HWND Window, UINT Message, WPARAM WParam, LPARAM LParam)
         case WM_KEYDOWN:
         case WM_KEYUP:
         {
-            u32 VKCode = WParam;
-            i32 WasDown = ((LParam & (1 << 30))!=0);
-            i32 IsDown = ((LParam & (1 << 31))==0);
-            if (TRUE){ //WasDown!=IsDown
-                if (VKCode == 'W')
+            u64 vkey_code = w_param;
+            i8 was_down = ((l_param & (1 << 30)) != 0);
+            i8 is_down = ((l_param & (1UL << 31)) == 0);
+
+            u64 key_input =0;
+
+            if ((vkey_code >= 'A' && vkey_code <= 'Z') || (vkey_code >='0' && vkey_code <= '9')){
+                key_input = (vkey_code >='A' && vkey_code <= 'Z') ? KEY_A + (vkey_code - 'A') : KEY_0 + (vkey_code - '0');
+            }else {
+                if (vkey_code == VK_F4){
+                    key_input = KEY_F4;
+                }else if (vkey_code == VK_SPACE){
+                    key_input = KEY_SPACE;
+                }else if (vkey_code == VK_MENU)
                 {
-                    //YOffset -=4;
+                    key_input= KEY_ALT;
+                }else if (vkey_code == VK_TAB)
+                 {
+                     key_input = KEY_TAB;
+                 }
+                else if (vkey_code == VK_LEFT)
+                {
+                    key_input = KEY_LEFT;
                 }
-                else if (VKCode == 'S')
+                else if (vkey_code == VK_RIGHT)
                 {
-                    //YOffset += 4;
+                    key_input = KEY_RIGHT;
                 }
-                else if (VKCode == 'A')
+                else if (vkey_code == VK_UP)
                 {
+                    key_input = KEY_UP;
                 }
-                else if (VKCode == 'D')
+                else if (vkey_code == VK_DOWN)
                 {
+                    key_input = KEY_DOWN;
                 }
-                else if (VKCode == 'E')
+                else if (vkey_code == VK_CONTROL)
                 {
-                }
-                else if (VKCode == 'Q')
-                {
-                }
-                else if (VKCode == VK_UP)
-                {
-                }
-                else if (VKCode == VK_DOWN)
-                {
-                }
-                else if (VKCode == VK_RIGHT)
-                {
-                }
-                else if (VKCode == VK_ESCAPE)
-                {
-                }
-                else if (VKCode == VK_SPACE)
-                {
+                    key_input = KEY_CTRL;
                 }
 
-                i32 AltKeyWasDown = ((LParam & (1 << 29)!=0));
-                if ((VKCode == VK_F4) && AltKeyWasDown)
-                {
-                    Running = FALSE;
-                }
+               //handle more keys
+            }
+            if (is_down){
+               if (p.key_down[key_input] == 0)
+               {
+                   p.key_pressed[key_input] = 1;
+               }
+               p.key_down[key_input] = 1;
+               p.last_key = (i32)key_input;
+               if(p.key_down[KEY_ALT] && key_input == KEY_F4)
+               {
+                   p.exit = TRUE;
+               }
+            }else 
+            {
+                p.key_down[key_input] = 0;
+                p.key_pressed[key_input] = 0;
             }
         }break;
         case WM_DESTROY:
         {
-            Running = FALSE;
+            p.exit = TRUE;
         } break;
         case WM_PAINT:
-
         {
-            PAINTSTRUCT Paint;
-            HDC DeviceContext = BeginPaint(Window, &Paint);
-            i32 X = Paint.rcPaint.left;
-            i32 Y = Paint.rcPaint.top;
-            i32 Height = Paint.rcPaint.bottom - Paint.rcPaint.top;
-            i32 Width = Paint.rcPaint.right - Paint.rcPaint.left;
-            win32_window_dimension Dimension = GetWindowDimension(Window);
-            Win32DisplayBufferInWindow(&GlobalBackBuffer,DeviceContext,Dimension.Width,Dimension.Height, X, Y, Width, Height);
-            EndPaint(Window, &Paint);
+            PAINTSTRUCT pnt;
+            HDC DeviceContext = BeginPaint(Window, &pnt);
+            i32 x = pnt.rcPaint.left;
+            i32 y = pnt.rcPaint.top;
+            i32 height = pnt.rcPaint.bottom - pnt.rcPaint.top;
+            i32 width = pnt.rcPaint.right - pnt.rcPaint.left;
+            win32_WinDim dim = win32_get_win_dim(Window);
+            win32_paint_buffer_in_window(&back_buffer,DeviceContext,dim.width,dim.height, x, y, width, height);
+            EndPaint(Window, &pnt);
         } break;
         default:
         {
-            Result = DefWindowProc(Window, Message, WParam, LParam);
+            Result = DefWindowProc(Window, msg, w_param, l_param);
         } break;
     }
+
     return(Result);
 }
 
 
-Win32DisplayBufferInWindow(win32_offscreen_buffer *Buffer,HDC DeviceContext, i32 WindowWidth, i32 WindowHeight, i32 X, i32 Y, i32 Width, i32 Height)
+internal i32 win32_paint_buffer_in_window(win32_offscreen_buffer *buf,HDC DeviceContext, i32 window_width, i32 window_height, i32 X, i32 Y, i32 width, i32 height)
 {
     StretchDIBits(DeviceContext,
 
                   /*
-                  X, Y, Width, Height,
-                  X, Y, Width, Height,
+                  X, Y, width, height,
+                  X, Y, width, height,
                   */
 
-                  0, 0, Buffer->Width, Buffer->Height,
+                  0, 0, buf->width, buf->height,
 
-                  0, 0, WindowWidth, WindowHeight,
+                  0, 0, window_width, window_height,
 
-                  Buffer->Memory,
+                  buf->data,
 
-                  &Buffer->Info,
+                  &buf->Info,
 
                   DIB_RGB_COLORS, SRCCOPY);
 }
 
+//just writes to the buffer
 internal void
-RenderWeirdGradient(win32_offscreen_buffer *Buffer,i32 XOffset, i32 YOffset)
+render_weird_effect(win32_offscreen_buffer *buf,i32 XOffset, i32 YOffset)
 {
 
-    i32 Width = Buffer->Width;
+    i32 width = buf->width;
 
-    i32 Height = Buffer->Height;
+    i32 height = buf->height;
 
-	u8 *Row = (u8 *) Buffer->Memory;
+	u8 *row = (u8 *) buf->data;
 
-	for(i32 Y=0; Y < Buffer->Height; Y++)
+	for(i32 Y=0; Y < buf->height; Y++)
 	{
-		u32 *Pixel = (u32 *) Row;
-		for(i32 X=0; X < Buffer->Width; X++)
+		u32 *pixel = (u32 *) row;
+		for(i32 X=0; X < buf->width; X++)
 		{
 
 			u8 Blue = (X + XOffset);
 			u8 Green = (Y + YOffset);
-			*Pixel++ = ((Green << 8) | Blue);
+			*pixel++ = ((Green << 8) | Blue);
 		}
-		Row = Row + Buffer->Pitch;
+		row = row + buf->pitch;
 	}
 }
 
 INT WINAPI WinMain(HINSTANCE Instance, HINSTANCE hPrevInstance,
     PSTR lpCmdLine, INT nCmdShow)
 {
+  init();
   LARGE_INTEGER PerfCounterFrequency;
   QueryPerformanceFrequency(&PerfCounterFrequency);
 
   WNDCLASS WindowClass = {0};
 
   WindowClass.style = CS_HREDRAW|CS_VREDRAW;
-  WindowClass.lpfnWndProc = Win32MainWindowCallback;
+  WindowClass.lpfnWndProc = win32_callback;
   WindowClass.hInstance = Instance;
-  WindowClass.lpszClassName = "HandmadeHeroWindowClass";
+  WindowClass.lpszClassName = ":)";
 
 
 
@@ -242,7 +260,7 @@ INT WINAPI WinMain(HINSTANCE Instance, HINSTANCE hPrevInstance,
            CreateWindowExA(
                 0,
                 WindowClass.lpszClassName,
-                "Software Rasterizer",
+                "Software Rasterizer ",
                 WS_OVERLAPPEDWINDOW|WS_VISIBLE,
                 CW_USEDEFAULT,
                 CW_USEDEFAULT,
@@ -258,40 +276,36 @@ INT WINAPI WinMain(HINSTANCE Instance, HINSTANCE hPrevInstance,
 
 
 
-          //NOTE(ilias): sound test
-          i32 SamplesPerSecond = 48000;
-          int ToneHz = 256;
-          u32 RunningSampleIndex= 0;
-          i32 SquareWaveCounter = 0;
-          i32 SquareWavePeriod = SamplesPerSecond/ToneHz;
-          i32 HalfSquareWavePeriod = SquareWavePeriod / 2;
-          i32 BytesPerSample = sizeof(int16_t) * 2;
-          i32 SecondaryBufferSize = SamplesPerSecond * BytesPerSample;
-
-          Running = TRUE;
+          p.exit = FALSE;
 
           LARGE_INTEGER LastCounter;
           QueryPerformanceCounter(&LastCounter);
 
           i64 LastCycleCount = __rdtsc();
 
-          while(Running)
+          while(!p.exit)
           {
-              MSG Message;
-              while(PeekMessage(&Message, 0, 0, 0, PM_REMOVE))
+              MSG msg;
+              while(PeekMessage(&msg, 0, 0, 0, PM_REMOVE))
               {
-                  if(Message.message == WM_QUIT)
+                  if(msg.message == WM_QUIT)
                   {
-                      Running = FALSE;
+                      p.exit = FALSE;
                   }
-                  TranslateMessage(&Message);
-                  DispatchMessageA(&Message);
+                  TranslateMessage(&msg);
+                  DispatchMessageA(&msg);
               }
               HDC DeviceContext = GetDC(Window);
 
-              win32_window_dimension Dimension = GetWindowDimension(Window);
-              RenderWeirdGradient(&GlobalBackBuffer,XOffset, 0);
-              Win32DisplayBufferInWindow(&GlobalBackBuffer,DeviceContext, Dimension.Width,Dimension.Height, 0, 0, Dimension.Width, Dimension.Height);
+              win32_WinDim dim = win32_get_win_dim(Window);
+              update(0.f);
+              render();
+              if (p.key_pressed[KEY_W])
+                  YOffset++;
+              if (p.key_pressed[KEY_S])
+                  YOffset--;
+              render_weird_effect(&back_buffer,XOffset, YOffset);
+              win32_paint_buffer_in_window(&back_buffer, DeviceContext, dim.width,dim.height, 0, 0, dim.width, dim.height);
 
               ReleaseDC(Window, DeviceContext);
 
@@ -311,9 +325,9 @@ INT WINAPI WinMain(HINSTANCE Instance, HINSTANCE hPrevInstance,
               i64 FPS = PerfCounterFrequency.QuadPart / CounterElapsed;
 
               //NOTE(ilias): must open fucking devenv
-              char Buffer[256];
-              wsprintf(Buffer, "Miliseconds/frame = %dms, %dFPS, %d cycles/frame\n", MSPerFrame, FPS,CyclesElapsed);
-              OutputDebugStringA(Buffer);
+              char buf[256];
+              wsprintf(buf, "Miliseconds/frame = %dms, %dFPS, %d cycles/frame\n", MSPerFrame, FPS,CyclesElapsed);
+              OutputDebugStringA(buf);
               LastCycleCount = EndCycleCount;
               LastCounter.QuadPart = EndCounter.QuadPart;
 
