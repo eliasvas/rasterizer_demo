@@ -1,4 +1,5 @@
 #include "windows.h"
+#include <stdlib.h>
 #include  "rast.h"
 #define THREAD_COUNT 4 
 char info_log[512];
@@ -47,19 +48,11 @@ Win32ResizeDIBSection(win32_offscreen_buffer *buf,i32 width, i32 height)
 
     buf->height = height;
     buf->bytes_per_pixel = 4;
-
-
-
     buf->Info.bmiHeader.biSize = sizeof(buf->Info.bmiHeader);
-
     buf->Info.bmiHeader.biWidth = buf->width;
-
     buf->Info.bmiHeader.biHeight = -buf->height;
-
     buf->Info.bmiHeader.biPlanes = 1;
-
     buf->Info.bmiHeader.biBitCount = 32;
-
     buf->Info.bmiHeader.biCompression = BI_RGB;
 
 
@@ -72,6 +65,25 @@ Win32ResizeDIBSection(win32_offscreen_buffer *buf,i32 width, i32 height)
 }
 
 
+internal i32 win32_paint_buffer_in_window(win32_offscreen_buffer *buf,HDC DeviceContext, i32 window_width, i32 window_height, i32 X, i32 Y, i32 width, i32 height)
+{
+    StretchDIBits(DeviceContext,
+
+                  /*
+                  X, Y, width, height,
+                  X, Y, width, height,
+                  */
+
+                  0, 0, buf->width, buf->height,
+
+                  0, 0, window_width, window_height,
+
+                  buf->data,
+
+                  &buf->Info,
+
+                  DIB_RGB_COLORS, SRCCOPY);
+}
 
 
 LRESULT CALLBACK
@@ -191,25 +203,6 @@ win32_callback(HWND Window, UINT msg, WPARAM w_param, LPARAM l_param)
 }
 
 
-internal i32 win32_paint_buffer_in_window(win32_offscreen_buffer *buf,HDC DeviceContext, i32 window_width, i32 window_height, i32 X, i32 Y, i32 width, i32 height)
-{
-    StretchDIBits(DeviceContext,
-
-                  /*
-                  X, Y, width, height,
-                  X, Y, width, height,
-                  */
-
-                  0, 0, buf->width, buf->height,
-
-                  0, 0, window_width, window_height,
-
-                  buf->data,
-
-                  &buf->Info,
-
-                  DIB_RGB_COLORS, SRCCOPY);
-}
 
 //just writes to the buffer
 internal void
@@ -281,7 +274,7 @@ INT WINAPI WinMain(HINSTANCE Instance, HINSTANCE hPrevInstance,
           LARGE_INTEGER LastCounter;
           QueryPerformanceCounter(&LastCounter);
 
-          i64 LastCycleCount = __rdtsc();
+          i64 LastCycleCount = 0;//__rdtsc();
 
           while(!p.exit)
           {
@@ -316,7 +309,7 @@ INT WINAPI WinMain(HINSTANCE Instance, HINSTANCE hPrevInstance,
               LARGE_INTEGER EndCounter;
               QueryPerformanceCounter(&EndCounter);
 
-              i64 EndCycleCount = __rdtsc();
+              i64 EndCycleCount = 0;//__rdtsc();
 
               i64 CyclesElapsed = EndCycleCount - LastCycleCount; 
               i64 CounterElapsed = EndCounter.QuadPart - LastCounter.QuadPart;
