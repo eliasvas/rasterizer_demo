@@ -5,6 +5,7 @@
 char info_log[512];
 Platform p;
 i32 YOffset;
+char window_name[512];
 
 typedef struct win32_offscreen_buffer {
     BITMAPINFO Info;
@@ -105,7 +106,7 @@ win32_callback(HWND Window, UINT msg, WPARAM w_param, LPARAM l_param)
         } break;
         case WM_CLOSE:
         {
-            p.exit = FALSE;
+            p.exit = TRUE;
         } break;
         case WM_ACTIVATEAPP:
 
@@ -316,6 +317,9 @@ INT WINAPI WinMain(HINSTANCE Instance, HINSTANCE hPrevInstance,
               i32 MSPerFrame = (1000*CounterElapsed) / PerfCounterFrequency.QuadPart;
 
               i64 FPS = PerfCounterFrequency.QuadPart / CounterElapsed;
+              sprintf(window_name, "Software Rasterizer ");
+              sprintf(window_name + str_size("Software Rasterizer "), itoa(FPS, window_name + str_size("Software Rasterizer "), 10));
+              SetWindowTextA(Window, window_name);
 
               //NOTE(ilias): must open fucking devenv
               char buf[256];
