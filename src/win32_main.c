@@ -230,10 +230,35 @@ render_weird_effect(win32_offscreen_buffer *buf,i32 XOffset, i32 YOffset)
 	}
 }
 
+
+internal void
+render_main_fbo(win32_offscreen_buffer *buf)
+{
+
+    i32 width = buf->width;
+
+    i32 height = buf->height;
+
+	u8 *row = (u8 *) buf->data;
+
+	for(i32 Y=buf->height-1; Y >= 0; --Y)
+	{
+		u32 *pixel = (u32 *) row;
+		for(i32 X=0; X < buf->width; ++X)
+		{	
+			u8 Red = minimum((u32)255, (u32)(rc.data[4 * (Y*rc.render_width + X) + 0] * 255.f));
+			u8 Green = minimum((u32)255,(u32)(rc.data[4 * (Y*rc.render_width + X) + 1] * 255.f));
+			u8 Blue = minimum((u32)255,(u32)(rc.data[4 * (Y*rc.render_width + X) + 2] * 255.f));
+			*pixel++ = ((Red << 16) | ((Green << 8) | Blue));
+		}
+		row = row + buf->pitch;
+	}
+}
+
 INT WINAPI WinMain(HINSTANCE Instance, HINSTANCE hPrevInstance,
     PSTR lpCmdLine, INT nCmdShow)
 {
-  init();
+  
   LARGE_INTEGER PerfCounterFrequency;
   QueryPerformanceFrequency(&PerfCounterFrequency);
 
@@ -264,6 +289,7 @@ INT WINAPI WinMain(HINSTANCE Instance, HINSTANCE hPrevInstance,
                 0,
                 Instance,
                 0);
+	  init();
       if(Window)
       {
           i32 XOffset = 0;
@@ -276,7 +302,7 @@ INT WINAPI WinMain(HINSTANCE Instance, HINSTANCE hPrevInstance,
           QueryPerformanceCounter(&LastCounter);
 
           i64 LastCycleCount = 0;//__rdtsc();
-
+		
           while(!p.exit)
           {
               MSG msg;
@@ -298,7 +324,8 @@ INT WINAPI WinMain(HINSTANCE Instance, HINSTANCE hPrevInstance,
                   YOffset++;
               if (p.key_pressed[KEY_S])
                   YOffset--;
-              render_weird_effect(&back_buffer,XOffset, YOffset);
+              //render_weird_effect(&back_buffer,XOffset, YOffset);
+			  render_main_fbo(&back_buffer);
               win32_paint_buffer_in_window(&back_buffer, DeviceContext, dim.width,dim.height, 0, 0, dim.width, dim.height);
 
               ReleaseDC(Window, DeviceContext);
@@ -315,6 +342,8 @@ INT WINAPI WinMain(HINSTANCE Instance, HINSTANCE hPrevInstance,
               i64 CyclesElapsed = EndCycleCount - LastCycleCount; 
               i64 CounterElapsed = EndCounter.QuadPart - LastCounter.QuadPart;
               i32 MSPerFrame = (1000*CounterElapsed) / PerfCounterFrequency.QuadPart;
+			  p.current_time += MSPerFrame / 1000.f;
+			  //p.current_time += 1.f/60;
 
               i64 FPS = PerfCounterFrequency.QuadPart / CounterElapsed;
               sprintf(window_name, "Software Rasterizer ");
