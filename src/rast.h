@@ -3,8 +3,9 @@
 #include "tools.h"
 #include "platform.h"
 #include "geometry.h"
+
 extern Platform p;
-#define EPILEPSY
+
 typedef struct RenderingContext
 {
 	u32 render_width, render_height;
@@ -17,6 +18,9 @@ typedef struct RenderingContext
 	//maybe add double buffering??? idk
 }RenderingContext;
 
+vec3 light_dir = {0.2f, 0.5f, -1.f};
+mat4 proj;
+mat4 view;
 global RenderingContext rc;
 
 internal void rend_clear(RenderingContext *rc, vec4 clear_color)
@@ -29,7 +33,7 @@ internal void rend_clear(RenderingContext *rc, vec4 clear_color)
 		rc->data[4 * i + 2] = clear_color.elements[2];
 		rc->data[4 * i + 3] = clear_color.elements[3];
 		//clear fbo depth info
-		rc->zbuf[i] = -1.f;
+		rc->zbuf[i] = -10000.f;
 	}
 
 }
@@ -70,7 +74,7 @@ internal void rend_line(RenderingContext *rc, ivec2 t0, ivec2 t1, vec4 color)
 	}
 }
 
-vec3 barycentric(ivec2 *points, ivec2 P)
+vec3 barycentric(ivec2 *points, ivec3 P)
 {
     vec3 u = vec3_cross(v3(points[2].x - points[0].x, points[1].x - points[0].x, points[0].x - P.x),v3(points[2].y - points[0].y, points[1].y - points[0].y, points[0].y - P.y));
     if (fabs(u.z) < 1.f)
@@ -92,7 +96,7 @@ void triangle(ivec2 *points, vec4 color)
             bboxmax.elements[j] = minimum(clamp.elements[j], maximum(bboxmax.elements[j], points[i].elements[j]));
         }
     }
-    ivec2 P;
+    ivec3 P;
     for (P.x = bboxmin.x; P.x <= bboxmax.x; ++P.x)
     {
         for (P.y = bboxmin.y; P.y <= bboxmax.y; ++P.y)
@@ -102,11 +106,21 @@ void triangle(ivec2 *points, vec4 color)
             if (bc_screen.x < 0 || bc_screen.y < 0 || bc_screen.z < 0)
                 continue;
             //if it is we paint!
+            P.z = 0;
+            //we find the real depth through interpolation!!
+            for(i32 i = 0; i < 3; ++i)
+                P.z += points[i].elements[2]*bc_screen.elements[i];
             u32 index = P.x + P.y * rc.render_width;
-            rc.data[4 * index + 0] = color.elements[0];
-            rc.data[4 * index + 1] = color.elements[1];
-            rc.data[4 * index + 2] = color.elements[2];
-            rc.data[4 * index + 3] = color.elements[3];
+            //if our pixel is closer than the zbuf's current, we render
+            if (rc.zbuf[index] < P.z)
+            //if (TRUE)
+            {
+                rc.zbuf[index] = P.z;
+                rc.data[4 * index + 0] = color.elements[0];
+                rc.data[4 * index + 1] = color.elements[1];
+                rc.data[4 * index + 2] = color.elements[2];
+                rc.data[4 * index + 3] = color.elements[3];
+            }
 
         }
     }
@@ -123,7 +137,11 @@ internal void init(void)
 	rc.cull_faces = FALSE;
 	rc.blend_func = FALSE; //no blending!
 
-    sphere_data = gen_sphere_data(1.f, 4, 4);
+    //look_at(vec3 eye, vec3 center, vec3 fake_up)
+    view = look_at(v3(0,0,-50), v3(0,0,0), v3(0,1,0));
+    proj = perspective_proj(45.f,rc.render_width/ (f32)rc.render_height, 0.1f,100.f); 
+
+    sphere_data = gen_sphere_data(1.f, 8, 8);
 }
 
 internal void update(f32 dt)
@@ -161,17 +179,18 @@ internal void render(void)
         (ivec2){(sphere_data[i+1].pos.x + 2.f) * 100, (sphere_data[i+1].pos.y + 2.f) * 100},
         (ivec2){(sphere_data[i+2].pos.x + 2.f) * 100, (sphere_data[i+2].pos.y + 2.f) * 100}};
 
-#if defined(EPILEPSY)
-        triangle(points, v4(random01(), random01(), random01(),1));
-#else
-        triangle(points, v4(i / (f32)sphere_verts_count, i / (f32)sphere_verts_count, i / (f32)sphere_verts_count,1));
-#endif
 
-            /*
-        rend_line(&rc, v0, v1, v4(1,0,0,1));
-        rend_line(&rc, v1, v2, v4(0,1,0,1));
-        rend_line(&rc, v2, v0, v4(0,0,1,1));
-            */
+
+        vec4 base_color = v4(0.7,0.3,0.3,1.f);
+        f32 intensity = vec3_dot(vec3_normalize(sphere_data[i].norm), vec3_normalize(light_dir));
+        base_color = vec4_mulf(base_color, intensity);
+#if defined(EPILEPSY)
+        if (intensity > 0)
+            triangle(points, v4(random01(), random01(), random01(),1));
+#else
+        if (intensity > 0)
+            triangle(points, base_color);
+#endif
     }
 
 }
