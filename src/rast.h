@@ -4,7 +4,7 @@
 #include "platform.h"
 #include "geometry.h"
 extern Platform p;
-
+#define EPILEPSY
 typedef struct RenderingContext
 {
 	u32 render_width, render_height;
@@ -72,8 +72,8 @@ internal void rend_line(RenderingContext *rc, ivec2 t0, ivec2 t1, vec4 color)
 
 vec3 barycentric(ivec2 *points, ivec2 P)
 {
-    vec3 u = vec3_cross(v3(points[2].x - points[0].x, points[1].x - points[0].x, points[1].x - P.x),v3(points[2].y - points[0].y, points[1].y - points[0].y, points[1].y - P.y));
-    if (fabs(u.z) < 1)
+    vec3 u = vec3_cross(v3(points[2].x - points[0].x, points[1].x - points[0].x, points[0].x - P.x),v3(points[2].y - points[0].y, points[1].y - points[0].y, points[0].y - P.y));
+    if (fabs(u.z) < 1.f)
         return v3(-1,-1,-1);
     return v3(1.f - (u.x +u.y)/u.z, u.y/u.z, u.x/u.z);
 }
@@ -161,7 +161,12 @@ internal void render(void)
         (ivec2){(sphere_data[i+1].pos.x + 2.f) * 100, (sphere_data[i+1].pos.y + 2.f) * 100},
         (ivec2){(sphere_data[i+2].pos.x + 2.f) * 100, (sphere_data[i+2].pos.y + 2.f) * 100}};
 
-        triangle(points, v4(1,1,0.4,1));
+#if defined(EPILEPSY)
+        triangle(points, v4(random01(), random01(), random01(),1));
+#else
+        triangle(points, v4(i / (f32)sphere_verts_count, i / (f32)sphere_verts_count, i / (f32)sphere_verts_count,1));
+#endif
+
             /*
         rend_line(&rc, v0, v1, v4(1,0,0,1));
         rend_line(&rc, v1, v2, v4(0,1,0,1));
