@@ -342,7 +342,7 @@ INT WINAPI WinMain(HINSTANCE Instance, HINSTANCE hPrevInstance,
               i64 CyclesElapsed = EndCycleCount - LastCycleCount; 
               i64 CounterElapsed = EndCounter.QuadPart - LastCounter.QuadPart;
               i32 MSPerFrame = (1000*CounterElapsed) / PerfCounterFrequency.QuadPart;
-			  p.current_time += MSPerFrame / 1000.f;
+			  p.current_time += (f32)CounterElapsed / PerfCounterFrequency.QuadPart;
 			  //p.current_time += 1.f/60;
 
               i64 FPS = PerfCounterFrequency.QuadPart / CounterElapsed;

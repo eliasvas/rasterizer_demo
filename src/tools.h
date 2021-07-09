@@ -85,6 +85,13 @@ INLINE f32 fabs2(f32 x)
     return x < 0 ? -x : x;
 }
 
+INLINE swap_ints(i32 *l, i32*r)
+{
+    i32 temp = *l;
+    *l = *r;
+    *r = temp;
+}
+
 
 //cos_32 computes a cosine to about 3.2 decimal digits of accuracy
 INLINE f32 
@@ -432,6 +439,13 @@ typedef union ivec2
     };
     i32 elements[2];
 }ivec2;
+
+INLINE void ivec2_swap(ivec2 *l, ivec2 *r)
+{
+    ivec2 temp = *l;
+    *l = *r;
+    *r = temp;
+}
 
 
 INLINE b32 ivec3_equals(ivec3 l, ivec3 r)
