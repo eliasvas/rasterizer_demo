@@ -2,24 +2,8 @@
 #define RAST_H
 #include "tools.h"
 #include "platform.h"
+#include "geometry.h"
 extern Platform p;
-
-typedef struct Vertex
-{
-	vec3 pos;
-	vec3 norm;
-	vec2 texcoord;
-}Vertex;
-
-Vertex quad_verts[6] = 
-{
-	{{-0.5f,-0.5f,0.f},{0.f,0.f,-1.f},{0.f,0.f}},
-	{{0.5,-0.5,0},{0,0,-1},{1,0}},
-	{{0.5,0.5,0},{0,0,-1},{1,1}},
-	{{0.5,0.5,0},{0,0,-1},{1,1}},
-	{{-0.5,0.5,0},{0,0,-1},{0,1}},
-	{{-0.5,-0.5,0},{0,0,-1},{0,0}}
-};
 
 typedef struct RenderingContext
 {
@@ -86,6 +70,7 @@ internal void rend_line(RenderingContext *rc, ivec2 t0, ivec2 t1, vec4 color)
 	}
 }
 
+
 internal void init(void)
 {
 	rc = (RenderingContext){0};
@@ -96,6 +81,7 @@ internal void init(void)
 	rc.cull_faces = FALSE;
 	rc.blend_func = FALSE; //no blending!
 
+    sphere_data = gen_sphere_data(1.f, 4, 4);
 }
 
 internal void update(f32 dt)
@@ -109,17 +95,31 @@ internal void update(f32 dt)
 
 internal void render(void)
 {
-	rend_clear(&rc, v4(fabs(sin(p.current_time / 10.f)),0.1f,0.3f,1.f));
+	rend_clear(&rc, v4(0,0,0,1));
 
     ivec2 origin = (ivec2){rc.render_width / 2, rc.render_height / 2};
     ivec2 dest = (ivec2){origin.x + cos(p.current_time)*rc.render_width/4.f, origin.y + sin(p.current_time)*rc.render_width /4.f};
     rend_line(&rc, origin, dest, v4(1,1,1,1));
 
-    for (u32 i = 0; i < 5; ++i)
+    for (u32 i = 0; i < 6; i+=3)
     {
-        ivec2 from = (ivec2){(quad_verts[i].pos.x + 1.f) * 100, (quad_verts[i].pos.y + 1.f) * 100};
-        ivec2 to = (ivec2){(quad_verts[i+1].pos.x + 1.f) * 100, (quad_verts[i+1].pos.y + 1.f) * 100};
-        rend_line(&rc, from, to, v4(1,1,0,1));
+        ivec2 v0 = (ivec2){(quad_verts[i].pos.x + 1.f) * 100, (quad_verts[i].pos.y + 1.f) * 100};
+        ivec2 v1 = (ivec2){(quad_verts[i+1].pos.x + 1.f) * 100, (quad_verts[i+1].pos.y + 1.f) * 100};
+        ivec2 v2 = (ivec2){(quad_verts[i+2].pos.x + 1.f) * 100, (quad_verts[i+2].pos.y + 1.f) * 100};
+        rend_line(&rc, v0, v1, v4(1,0,0,1));
+        rend_line(&rc, v1, v2, v4(0,1,0,1));
+        rend_line(&rc, v2, v0, v4(0,0,1,1));
     }
+
+    for (u32 i = 0; i < sphere_verts_count; i+=3)
+    {
+        ivec2 v0 = (ivec2){(sphere_data[i].pos.x + 2.f) * 100, (sphere_data[i].pos.y + 2.f) * 100};
+        ivec2 v1 = (ivec2){(sphere_data[i+1].pos.x + 2.f) * 100, (sphere_data[i+1].pos.y + 2.f) * 100};
+        ivec2 v2 = (ivec2){(sphere_data[i+2].pos.x + 2.f) * 100, (sphere_data[i+2].pos.y + 2.f) * 100};
+        rend_line(&rc, v0, v1, v4(1,0,0,1));
+        rend_line(&rc, v1, v2, v4(0,1,0,1));
+        rend_line(&rc, v2, v0, v4(0,0,1,1));
+    }
+
 }
 #endif

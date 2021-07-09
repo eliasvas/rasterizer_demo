@@ -330,8 +330,7 @@ INT WINAPI WinMain(HINSTANCE Instance, HINSTANCE hPrevInstance,
 
               ReleaseDC(Window, DeviceContext);
 
-
-
+                           
               ++XOffset;
 
               LARGE_INTEGER EndCounter;
@@ -343,17 +342,12 @@ INT WINAPI WinMain(HINSTANCE Instance, HINSTANCE hPrevInstance,
               i64 CounterElapsed = EndCounter.QuadPart - LastCounter.QuadPart;
               i32 MSPerFrame = (1000*CounterElapsed) / PerfCounterFrequency.QuadPart;
 			  p.current_time += (f32)CounterElapsed / PerfCounterFrequency.QuadPart;
-			  //p.current_time += 1.f/60;
 
-              i64 FPS = PerfCounterFrequency.QuadPart / CounterElapsed;
+			  i64 FPS = PerfCounterFrequency.QuadPart / CounterElapsed;
               sprintf(window_name, "Software Rasterizer ");
               sprintf(window_name + str_size("Software Rasterizer "), itoa(FPS, window_name + str_size("Software Rasterizer "), 10));
               SetWindowTextA(Window, window_name);
 
-              //NOTE(ilias): must open fucking devenv
-              char buf[256];
-              wsprintf(buf, "Miliseconds/frame = %dms, %dFPS, %d cycles/frame\n", MSPerFrame, FPS,CyclesElapsed);
-              OutputDebugStringA(buf);
               LastCycleCount = EndCycleCount;
               LastCounter.QuadPart = EndCounter.QuadPart;
 
