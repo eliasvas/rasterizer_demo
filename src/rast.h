@@ -70,6 +70,48 @@ internal void rend_line(RenderingContext *rc, ivec2 t0, ivec2 t1, vec4 color)
 	}
 }
 
+vec3 barycentric(ivec2 *points, ivec2 P)
+{
+    vec3 u = vec3_cross(v3(points[2].x - points[0].x, points[1].x - points[0].x, points[1].x - P.x),v3(points[2].y - points[0].y, points[1].y - points[0].y, points[1].y - P.y));
+    if (fabs(u.z) < 1)
+        return v3(-1,-1,-1);
+    return v3(1.f - (u.x +u.y)/u.z, u.y/u.z, u.x/u.z);
+}
+
+void triangle(ivec2 *points, vec4 color)
+{ 
+    ivec2 bboxmin = iv2(rc.render_width-1, rc.render_height-1);
+    ivec2 bboxmax = iv2(0,0);
+    ivec2 clamp = iv2(rc.render_width-1, rc.render_height-1);
+    //we find the bounding box to test via barycentric coordinates
+    for (i32 i = 0; i < 3; ++i)
+    {
+        for (i32 j = 0; j < 2;++j)
+        {
+            bboxmin.elements[j] = maximum(0, minimum(bboxmin.elements[j], points[i].elements[j]));
+            bboxmax.elements[j] = minimum(clamp.elements[j], maximum(bboxmax.elements[j], points[i].elements[j]));
+        }
+    }
+    ivec2 P;
+    for (P.x = bboxmin.x; P.x <= bboxmax.x; ++P.x)
+    {
+        for (P.y = bboxmin.y; P.y <= bboxmax.y; ++P.y)
+        {
+            //we find if the point is in the trangle by testing barycentric coords
+            vec3 bc_screen = barycentric(points, P);
+            if (bc_screen.x < 0 || bc_screen.y < 0 || bc_screen.z < 0)
+                continue;
+            //if it is we paint!
+            u32 index = P.x + P.y * rc.render_width;
+            rc.data[4 * index + 0] = color.elements[0];
+            rc.data[4 * index + 1] = color.elements[1];
+            rc.data[4 * index + 2] = color.elements[2];
+            rc.data[4 * index + 3] = color.elements[3];
+
+        }
+    }
+
+}
 
 internal void init(void)
 {
@@ -101,6 +143,7 @@ internal void render(void)
     ivec2 dest = (ivec2){origin.x + cos(p.current_time)*rc.render_width/4.f, origin.y + sin(p.current_time)*rc.render_width /4.f};
     rend_line(&rc, origin, dest, v4(1,1,1,1));
 
+    /*
     for (u32 i = 0; i < 6; i+=3)
     {
         ivec2 v0 = (ivec2){(quad_verts[i].pos.x + 1.f) * 100, (quad_verts[i].pos.y + 1.f) * 100};
@@ -110,15 +153,20 @@ internal void render(void)
         rend_line(&rc, v1, v2, v4(0,1,0,1));
         rend_line(&rc, v2, v0, v4(0,0,1,1));
     }
+    */
 
     for (u32 i = 0; i < sphere_verts_count; i+=3)
     {
-        ivec2 v0 = (ivec2){(sphere_data[i].pos.x + 2.f) * 100, (sphere_data[i].pos.y + 2.f) * 100};
-        ivec2 v1 = (ivec2){(sphere_data[i+1].pos.x + 2.f) * 100, (sphere_data[i+1].pos.y + 2.f) * 100};
-        ivec2 v2 = (ivec2){(sphere_data[i+2].pos.x + 2.f) * 100, (sphere_data[i+2].pos.y + 2.f) * 100};
+        ivec2 points[3] = { (ivec2){(sphere_data[i].pos.x + 2.f) * 100, (sphere_data[i].pos.y + 2.f) * 100},
+        (ivec2){(sphere_data[i+1].pos.x + 2.f) * 100, (sphere_data[i+1].pos.y + 2.f) * 100},
+        (ivec2){(sphere_data[i+2].pos.x + 2.f) * 100, (sphere_data[i+2].pos.y + 2.f) * 100}};
+
+        triangle(points, v4(1,1,0.4,1));
+            /*
         rend_line(&rc, v0, v1, v4(1,0,0,1));
         rend_line(&rc, v1, v2, v4(0,1,0,1));
         rend_line(&rc, v2, v0, v4(0,0,1,1));
+            */
     }
 
 }

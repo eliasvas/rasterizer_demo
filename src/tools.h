@@ -440,6 +440,15 @@ typedef union ivec2
     i32 elements[2];
 }ivec2;
 
+INLINE ivec2 iv2(i32 x, i32 y)
+{
+    ivec2 res;
+    res.x = x;
+    res.y = y;
+    return res;
+}
+
+
 INLINE void ivec2_swap(ivec2 *l, ivec2 *r)
 {
     ivec2 temp = *l;
