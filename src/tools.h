@@ -592,7 +592,7 @@ INLINE vec2 vec2_rotate(vec2 v, f32 a) {
 
 INLINE f32 vec2_length(vec2 v)
 {
-    f32 res = sqrtf(dot_vec2(v,v)); // (x^2 + y^2)^(1/2)
+    f32 res = sqrt(dot_vec2(v,v)); // (x^2 + y^2)^(1/2)
     return res;
 }
 
@@ -676,7 +676,7 @@ INLINE f32 vec3_dot(vec3 l, vec3 r)
 
 INLINE f32 vec3_length(vec3 v)
 {
-    f32 res = sqrtf(vec3_dot(v,v)); // (x^2 + y^2)^(1/2)
+    f32 res = sqrt(vec3_dot(v,v)); // (x^2 + y^2)^(1/2)
     return res;
 }
 
@@ -1156,7 +1156,7 @@ INLINE mat4 perspective_proj(f32 fov, f32 aspect, f32 n, f32 f)
 {
     mat4 res = m4();
 
-    f32 cot = 1.0f / tanf(fov * (PI / 360.0f));
+    f32 cot = 1.0f / tan(fov * (PI / 360.0f));
 
     res.elements[0][0] = cot / aspect;
     res.elements[1][1] = cot;
@@ -1546,7 +1546,7 @@ INLINE Quaternion quat_inv(Quaternion l)
 {
     Quaternion res;
 
-    f32 len = sqrtf(dot_quat(l,l));
+    f32 len = sqrt(dot_quat(l,l));
     res = quat_divf(l, len);
 
     return res;
@@ -1592,7 +1592,7 @@ INLINE Quaternion quat_normalize(Quaternion l)
 {
     Quaternion res;
 
-    f32 len = sqrtf(quat_dot(l,l));
+    f32 len = sqrt(quat_dot(l,l));
     res = quat_divf(l,len);
 
     return res;
@@ -1701,7 +1701,7 @@ mat4_to_quat(mat4 m)
         }
     }
 
-    Q = quat_mulf(Q, 0.5f / sqrtf(T));
+    Q = quat_mulf(Q, 0.5f / sqrt(T));
 
     return Q;
 }
