@@ -4,6 +4,7 @@
 #define THREAD_COUNT 4 
 char info_log[512];
 Platform p;
+#include "camera.h"
 i32 YOffset;
 char window_name[512];
 
@@ -194,6 +195,22 @@ win32_callback(HWND Window, UINT msg, WPARAM w_param, LPARAM l_param)
             win32_paint_buffer_in_window(&back_buffer,DeviceContext,dim.width,dim.height, x, y, width, height);
             EndPaint(Window, &pnt);
         } break;
+        case (WM_LBUTTONDOWN):
+            {
+                p.left_mouse_down = 1;
+            }break;
+        case (WM_LBUTTONUP):
+            {
+                p.left_mouse_down = 0;
+            }break;
+        case (WM_RBUTTONDOWN):
+            {
+                p.right_mouse_down = 1;
+            }break;
+        case (WM_RBUTTONUP):
+            {
+                p.right_mouse_down = 0;
+            }break;
         default:
         {
             Result = DefWindowProc(Window, msg, w_param, l_param);
@@ -329,7 +346,14 @@ INT WINAPI WinMain(HINSTANCE Instance, HINSTANCE hPrevInstance,
               win32_paint_buffer_in_window(&back_buffer, DeviceContext, dim.width,dim.height, 0, 0, dim.width, dim.height);
 
               ReleaseDC(Window, DeviceContext);
-
+              {
+                POINT mouse;
+                GetCursorPos(&mouse);
+                ScreenToClient(Window, &mouse);
+                p.mouse_dt = v2(p.mouse_x - mouse.x, p.mouse_y - mouse.y);
+                p.mouse_x = (f32)(mouse.x);
+                p.mouse_y = (f32)(mouse.y);
+              }
                            
               ++XOffset;
 
@@ -342,6 +366,7 @@ INT WINAPI WinMain(HINSTANCE Instance, HINSTANCE hPrevInstance,
               i64 CounterElapsed = EndCounter.QuadPart - LastCounter.QuadPart;
               i32 MSPerFrame = (1000*CounterElapsed) / PerfCounterFrequency.QuadPart;
 			  p.current_time += (f32)CounterElapsed / PerfCounterFrequency.QuadPart;
+			  p.dt = (f32)CounterElapsed / PerfCounterFrequency.QuadPart;
 
 			  i64 FPS = PerfCounterFrequency.QuadPart / CounterElapsed;
               sprintf(window_name, "Software Rasterizer ");

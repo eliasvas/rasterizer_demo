@@ -3,6 +3,7 @@
 #include "tools.h"
 #include "platform.h"
 #include "geometry.h"
+#include "camera.h"
 
 extern Platform p;
 
@@ -20,7 +21,7 @@ typedef struct RenderingContext
 
 vec3 light_dir = {0.2f, 0.5f, -1.f};
 mat4 proj;
-mat4 view;
+Camera cam;
 global RenderingContext rc;
 
 internal void rend_clear(RenderingContext *rc, vec4 clear_color)
@@ -97,6 +98,7 @@ void triangle(vec3 *points, vec4 color)
         }
     }
     ivec3 P;
+    f32 depth;
     for (P.x = bboxmin.x; P.x <= bboxmax.x; ++P.x)
     {
         for (P.y = bboxmin.y; P.y <= bboxmax.y; ++P.y)
@@ -106,13 +108,13 @@ void triangle(vec3 *points, vec4 color)
             if (bc_screen.x < 0 || bc_screen.y < 0 || bc_screen.z < 0)
                 continue;
             //if it is we paint!
-            P.z = 0;
+            depth = 0;
             //we find the real depth through interpolation!!
             for(i32 i = 0; i < 3; ++i)
-                P.z += points[i].elements[2]*bc_screen.elements[i];
+                depth += points[i].elements[2]*bc_screen.elements[i];
             u32 index = P.x + P.y * rc.render_width;
             //if our pixel is closer than the zbuf's current, we render
-            if (rc.zbuf[index] > P.z)
+            if (rc.zbuf[index] > depth)
             //if (TRUE)
             {
                 rc.zbuf[index] = P.z;
@@ -138,7 +140,7 @@ internal void init(void)
 	rc.blend_func = FALSE; //no blending!
 
     //look_at(vec3 eye, vec3 center, vec3 fake_up)
-    view = look_at(v3(0,0,-10), v3(0,0,0), v3(0,1,0));
+    camera_init(&cam);
     proj = perspective_proj(45.f,rc.render_width/ (f32)rc.render_height, 0.1f,100.f); 
 
     /*
@@ -180,11 +182,11 @@ internal void init(void)
 internal vec3 project_point(vec3 coords)
 {
     vec4 local_coords = v4(coords.x, coords.y, coords.z, 1.f);
-    mat4 t = mat4_mul(mat4_translate(v3(0,0,0)), mat4_rotate(p.current_time * 40, v3(0,1,0)));
+    mat4 t = mat4_mul(mat4_translate(v3(0,0,0)), mat4_rotate(p.current_time * 0, v3(0,1,0)));
     t.elements[0][0] = 1.f;
     t.elements[1][1] = 1.f;
     t.elements[2][2] = 1.f;
-    vec4 ndc_coords = mat4_mulv(mat4_mul(proj, mat4_mul(view,t)), local_coords);
+    vec4 ndc_coords = mat4_mulv(mat4_mul(proj, mat4_mul(get_view_mat(&cam),t)), local_coords);
     //perspective divide??
     ndc_coords.x /= ndc_coords.w;
     ndc_coords.y /= ndc_coords.w;
@@ -202,6 +204,8 @@ internal void update(f32 dt)
 	{
 		init(); //TODO change later :)
 	}
+
+    camera_update(&cam);
 }
 
 internal void render(void)
