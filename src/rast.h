@@ -2,6 +2,7 @@
 #define RAST_H
 #include "tools.h"
 #include "platform.h"
+#include "texture.h"
 #include "geometry.h"
 #include "camera.h"
 
@@ -47,6 +48,7 @@ typedef struct RenderingContext
 vec3 light_dir = {0.2f, 0.5f, -1.f};
 
 global RenderingContext rc;
+Texture tex;
 
 internal void rend_clear(RenderingContext *rc, vec4 clear_color)
 {
@@ -135,17 +137,73 @@ void triangle(vec3 *points, vec4 color)
             depth = 0;
             //we find the real depth through interpolation!!
             for(i32 i = 0; i < 3; ++i)
-                depth += (f32)points[i].elements[2]*bc_screen.elements[i];
+                depth += (f32)points[i].z*bc_screen.elements[i];
             u32 index = P.x + P.y * rc.render_width;
             //if our pixel is closer than the zbuf's current, we render
+			vec4 col = tex.data[bc_screen.z * tex.texture_width];
+			col = color;
             if (rc.zbuf[index] > depth)
             //if (TRUE)
             {
                 rc.zbuf[index] = depth;
-                rc.data[4 * index + 0] = color.elements[0];
-                rc.data[4 * index + 1] = color.elements[1];
-                rc.data[4 * index + 2] = color.elements[2];
-                rc.data[4 * index + 3] = color.elements[3];
+                rc.data[4 * index + 0] = col.x;
+                rc.data[4 * index + 1] = col.y;
+                rc.data[4 * index + 2] = col.z;
+                rc.data[4 * index + 3] = col.w;
+            }
+
+        }
+    }
+
+}
+
+void triangle_tex(Vertex *verts, Texture *t)
+{ 
+    ivec2 bboxmin = iv2(rc.render_width-1, rc.render_height-1);
+    ivec2 bboxmax = iv2(0,0);
+    ivec2 clamp = iv2(rc.render_width-1, rc.render_height-1);
+    //we find the bounding box to test via barycentric coordinates
+    for (i32 i = 0; i < 3; ++i)
+    {
+        for (i32 j = 0; j < 2;++j)
+        {
+            bboxmin.elements[j] = maximum(0, minimum(bboxmin.elements[j], verts[i].pos.elements[j]));
+            bboxmax.elements[j] = minimum(clamp.elements[j], maximum(bboxmax.elements[j], verts[i].pos.elements[j]));
+        }
+    }
+    ivec3 P;
+    f32 depth;
+    for (P.x = bboxmin.x; P.x <= bboxmax.x; ++P.x)
+    {
+        for (P.y = bboxmin.y; P.y <= bboxmax.y; ++P.y)
+        {
+            //we find if the point is in the trangle by testing barycentric coords
+			vec3 points[3] = {verts[0].pos,verts[1].pos,verts[2].pos};
+            vec3 bc_screen = barycentric(points, P);
+            if (bc_screen.x < 0 || bc_screen.y < 0 || bc_screen.z < 0)
+                continue;
+            //if it is we paint!
+            depth = 0;
+			vec2 tex_coords = v2(0,0);
+            //we find the real depth through interpolation!!
+            for(i32 i = 0; i < 3; ++i)
+			{
+                depth += (f32)verts[i].pos.z*bc_screen.elements[i];
+				tex_coords.x += verts[i].texcoord.x * (f32)bc_screen.elements[i];
+				tex_coords.y += verts[i].texcoord.y * (f32)bc_screen.elements[i];
+            }
+			u32 index = P.x + P.y * rc.render_width;
+            //if our pixel is closer than the zbuf's current, we render
+			vec4 col = tex.data[tex_coords.x * tex.texture_width + tex_coords.y * tex.texture_height*tex.texture_width];
+			col = v4(random01(),0,random01(), 1);
+			if (rc.zbuf[index] > depth)
+            //if (TRUE)
+            {
+                rc.zbuf[index] = depth;
+                rc.data[4 * index + 0] = col.x;
+                rc.data[4 * index + 1] = col.y;
+                rc.data[4 * index + 2] = col.z;
+                rc.data[4 * index + 3] = col.w;
             }
 
         }
@@ -165,12 +223,12 @@ internal void init(void)
 	rc.render_settings = ZBUF_ON;
     camera_init(&rc.cam);
     rc.proj = perspective_proj(45.f,rc.render_width/ (f32)rc.render_height, 0.1f,100.f); 
-
+	tex = gen_sample_texture();
 }
 internal vec3 project_point(vec3 coords)
 {
     vec4 local_coords = v4(coords.x, coords.y, coords.z, 1.f);
-    mat4 t = mat4_mul(mat4_translate(v3(0,0,0)), mat4_rotate(p.current_time * 0, v3(0,1,0)));
+    mat4 t = mat4_mul(mat4_translate(v3(0,0,0)), mat4_rotate(p.current_time *0, v3(0,1,0)));
     vec4 ndc_coords = mat4_mulv(mat4_mul(rc.proj, mat4_mul(get_view_mat(&rc.cam),t)), local_coords);
     //perspective divide??
     ndc_coords.x /= ndc_coords.w;
@@ -178,7 +236,7 @@ internal vec3 project_point(vec3 coords)
     ndc_coords.z /= ndc_coords.w;
     ivec2 screen_coords = iv2(((ndc_coords.x + 1.f)/2) * rc.render_width, ((ndc_coords.y + 1.f)/2.f) * rc.render_height); 
     vec4 wc = mat4_mulv(t, local_coords);
-	ndc_coords.z = (ndc_coords.z+1)/2.f;
+	//ndc_coords.z = (ndc_coords.z+1)/2.f;
     return (vec3){screen_coords.x, screen_coords.y, ndc_coords.z};
 
 }
@@ -207,6 +265,7 @@ internal void render(void)
     //here we transform all points from local coordinate -> global coords -> view coords -> NDC coords -> screen coords
     for (u32 i = 0; i < 36; i+=3)
     {
+		/*
         vec3 points[3] = { (vec3){cube_data[i].pos.x, cube_data[i].pos.y,cube_data[i].pos.z},
                              (vec3){cube_data[i+1].pos.x, cube_data[i+1].pos.y,cube_data[i+1].pos.z},
                              (vec3){cube_data[i+2].pos.x, cube_data[i+2].pos.y,cube_data[i+2].pos.z}};
@@ -214,22 +273,27 @@ internal void render(void)
         points[0] = project_point(points[0]);
         points[1] = project_point(points[1]);
         points[2] = project_point(points[2]);
-
+		*/
+		Vertex verts[3] = {cube_data[i], cube_data[i+1], cube_data[i+2]};
+		verts[0].pos = project_point(verts[0].pos);
+		verts[1].pos = project_point(verts[1].pos);
+		verts[2].pos = project_point(verts[2].pos);
 
         vec4 base_color = v4(0.7,0.3,0.3,1.f);
-        f32 intensity = vec3_dot(vec3_normalize(cube_data[i].norm), vec3_normalize(light_dir));
-        intensity = (i+10) / (f32)36;
+        f32 intensity = (i+10) / (f32)36;
         base_color = vec4_mulf(base_color, intensity);
 		
 
 		if (rc.render_mode == TRIANGLE_MODE)
 		{
-			triangle(points, base_color);
+			//triangle(points, base_color);
+			triangle_tex(verts, &tex);
 		}else if (rc.render_mode == LINE_MODE)
 		{
-			rend_line(iv2(points[0].x,points[0].y), iv2(points[1].x,points[1].y), base_color);
-			rend_line(iv2(points[1].x,points[1].y), iv2(points[2].x,points[2].y), base_color);
-			rend_line(iv2(points[2].x,points[2].y), iv2(points[0].x,points[0].y), base_color);
+			
+			rend_line(iv2(verts[0].pos.x,verts[0].pos.y), iv2(verts[1].pos.x,verts[1].pos.y), base_color);
+			rend_line(iv2(verts[1].pos.x,verts[1].pos.y), iv2(verts[2].pos.x,verts[2].pos.y), base_color);
+			rend_line(iv2(verts[2].pos.x,verts[2].pos.y), iv2(verts[0].pos.x,verts[0].pos.y), base_color);
 		}
     }
 }
