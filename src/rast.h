@@ -11,8 +11,6 @@
 	
 	-blending
 	
-	-texturing
-	
 	-replace cstdlib functions (sin,tan...)
 */
 
@@ -109,54 +107,6 @@ vec3 barycentric(vec3 *points, ivec3 P)
     return v3(1.f - (u.x +u.y)/u.z, u.y/u.z, u.x/u.z);
 }
 
-void triangle(vec3 *points, vec4 color)
-{ 
-    ivec2 bboxmin = iv2(rc.render_width-1, rc.render_height-1);
-    ivec2 bboxmax = iv2(0,0);
-    ivec2 clamp = iv2(rc.render_width-1, rc.render_height-1);
-    //we find the bounding box to test via barycentric coordinates
-    for (i32 i = 0; i < 3; ++i)
-    {
-        for (i32 j = 0; j < 2;++j)
-        {
-            bboxmin.elements[j] = maximum(0, minimum(bboxmin.elements[j], points[i].elements[j]));
-            bboxmax.elements[j] = minimum(clamp.elements[j], maximum(bboxmax.elements[j], points[i].elements[j]));
-        }
-    }
-    ivec3 P;
-    f32 depth;
-    for (P.x = bboxmin.x; P.x <= bboxmax.x; ++P.x)
-    {
-        for (P.y = bboxmin.y; P.y <= bboxmax.y; ++P.y)
-        {
-            //we find if the point is in the trangle by testing barycentric coords
-            vec3 bc_screen = barycentric(points, P);
-            if (bc_screen.x < 0 || bc_screen.y < 0 || bc_screen.z < 0)
-                continue;
-            //if it is we paint!
-            depth = 0;
-            //we find the real depth through interpolation!!
-            for(i32 i = 0; i < 3; ++i)
-                depth += (f32)points[i].z*bc_screen.elements[i];
-            u32 index = P.x + P.y * rc.render_width;
-            //if our pixel is closer than the zbuf's current, we render
-			vec4 col = tex.data[(int)(bc_screen.z * tex.texture_width)];
-			col = color;
-            if (rc.zbuf[index] > depth)
-            //if (TRUE)
-            {
-                rc.zbuf[index] = depth;
-                rc.data[4 * index + 0] = col.x;
-                rc.data[4 * index + 1] = col.y;
-                rc.data[4 * index + 2] = col.z;
-                rc.data[4 * index + 3] = col.w;
-            }
-
-        }
-    }
-
-}
-
 void triangle_tex(Vertex *verts, Texture *t)
 { 
     ivec2 bboxmin = iv2(rc.render_width-1, rc.render_height-1);
@@ -199,7 +149,7 @@ void triangle_tex(Vertex *verts, Texture *t)
             }
 			u32 index = P.x + P.y * rc.render_width;
             //if our pixel is closer than the zbuf's current, we render
-			vec4 col = tex.data[(int)(tex_coords.x * tex.texture_width) + (int)(tex_coords.y * (tex.texture_height-1)*tex.texture_width)];
+			vec4 col = t->data[(int)(tex_coords.x * t->texture_width) + (int)(tex_coords.y * (t->texture_height-1)*t->texture_width)];
 			//col = v4(random01(),0,random01(), 1);
 			if (rc.zbuf[index] > depth)
             //if (TRUE)
