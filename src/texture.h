@@ -20,14 +20,14 @@ typedef struct Texture
 internal Texture gen_sample_texture(void)
 {
 	Texture tex;
-	tex.texture_width = 256;
-	tex.texture_height = 256;
+	tex.texture_width = 32;
+	tex.texture_height = 32;
 	tex.data = (vec4*)malloc(sizeof(vec4)*tex.texture_width*tex.texture_height);
 	for (u32 y = 0;y < tex.texture_height; ++y)
 	{
 		for (u32 x = 0; x < tex.texture_width; ++x)
 		{
-			tex.data[x + y * tex.texture_width] = v4((x%16)/16.f,0,0,1);
+            tex.data[x + y * tex.texture_height] = v4(y / (f32)tex.texture_height, 0, 0, 1);
 		}
 	}
 	tex.tf = LINEAR_FILTER;

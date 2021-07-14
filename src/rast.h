@@ -140,7 +140,7 @@ void triangle(vec3 *points, vec4 color)
                 depth += (f32)points[i].z*bc_screen.elements[i];
             u32 index = P.x + P.y * rc.render_width;
             //if our pixel is closer than the zbuf's current, we render
-			vec4 col = tex.data[bc_screen.z * tex.texture_width];
+			vec4 col = tex.data[(int)(bc_screen.z * tex.texture_width)];
 			col = color;
             if (rc.zbuf[index] > depth)
             //if (TRUE)
@@ -180,6 +180,9 @@ void triangle_tex(Vertex *verts, Texture *t)
             //we find if the point is in the trangle by testing barycentric coords
 			vec3 points[3] = {verts[0].pos,verts[1].pos,verts[2].pos};
             vec3 bc_screen = barycentric(points, P);
+            vec3 bc_clip = v3(bc_screen.x / points[0].z, bc_screen.y / points[1].z, bc_screen.z / points[2].z);
+            bc_clip = vec3_mulf(bc_clip, 1.f / (bc_clip.x + bc_clip.y + bc_clip.z));
+
             if (bc_screen.x < 0 || bc_screen.y < 0 || bc_screen.z < 0)
                 continue;
             //if it is we paint!
@@ -191,11 +194,13 @@ void triangle_tex(Vertex *verts, Texture *t)
                 depth += (f32)verts[i].pos.z*bc_screen.elements[i];
 				tex_coords.x += verts[i].texcoord.x * (f32)bc_screen.elements[i];
 				tex_coords.y += verts[i].texcoord.y * (f32)bc_screen.elements[i];
+                //assert(verts[i].texcoord.y <= 1.f);
+                //assert(verts[i].texcoord.x <= 1.f);
             }
 			u32 index = P.x + P.y * rc.render_width;
             //if our pixel is closer than the zbuf's current, we render
-			vec4 col = tex.data[tex_coords.x * tex.texture_width + tex_coords.y * tex.texture_height*tex.texture_width];
-			col = v4(random01(),0,random01(), 1);
+			vec4 col = tex.data[(int)(tex_coords.x * tex.texture_width) + (int)(tex_coords.y * (tex.texture_height-1)*tex.texture_width)];
+			//col = v4(random01(),0,random01(), 1);
 			if (rc.zbuf[index] > depth)
             //if (TRUE)
             {
