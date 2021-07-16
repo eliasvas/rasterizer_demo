@@ -107,8 +107,28 @@ vec3 barycentric(vec3 *points, ivec3 P)
     return v3(1.f - (u.x +u.y)/u.z, u.y/u.z, u.x/u.z);
 }
 
+internal vec3 project_point(vec3 coords, f32 *w)
+{
+    vec4 local_coords = v4(coords.x, coords.y, coords.z, 1.f);
+    mat4 t = mat4_mul(mat4_translate(v3(0,0,0)), mat4_rotate(p.current_time *0, v3(0,1,0)));
+    vec4 ndc_coords = mat4_mulv(mat4_mul(rc.proj, mat4_mul(get_view_mat(&rc.cam),t)), local_coords);
+    //perspective divide??
+    ndc_coords.x /= ndc_coords.w;
+    ndc_coords.y /= ndc_coords.w;
+    ndc_coords.z /= ndc_coords.w;
+	*w = ndc_coords.w;
+    ivec2 screen_coords = iv2(((ndc_coords.x + 1.f)/2) * rc.render_width, ((ndc_coords.y + 1.f)/2.f) * rc.render_height); 
+    vec4 wc = mat4_mulv(t, local_coords);
+	//ndc_coords.z = (ndc_coords.z+1)/2.f;
+    return (vec3){screen_coords.x, screen_coords.y, ndc_coords.z};
+
+}
 void triangle_tex(Vertex *verts, Texture *t)
 { 
+	f32 w[3]; //the w's from projection of the 3 points!
+	verts[0].pos = project_point(verts[0].pos, &w[0]);
+	verts[1].pos = project_point(verts[1].pos, &w[1]);
+	verts[2].pos = project_point(verts[2].pos, &w[2]);
     ivec2 bboxmin = iv2(rc.render_width-1, rc.render_height-1);
     ivec2 bboxmax = iv2(0,0);
     ivec2 clamp = iv2(rc.render_width-1, rc.render_height-1);
@@ -130,8 +150,8 @@ void triangle_tex(Vertex *verts, Texture *t)
             //we find if the point is in the trangle by testing barycentric coords
 			vec3 points[3] = {verts[0].pos,verts[1].pos,verts[2].pos};
             vec3 bc_screen = barycentric(points, P);
-            vec3 bc_clip = v3(bc_screen.x / points[0].z, bc_screen.y / points[1].z, bc_screen.z / points[2].z);
-            bc_clip = vec3_mulf(bc_clip, 1.f / (bc_clip.x + bc_clip.y + bc_clip.z));
+            vec3 bc_clip = v3(bc_screen.x / w[0], bc_screen.y / w[1], bc_screen.z / w[2]);
+            bc_clip = vec3_mulf(bc_clip, 1.f / (bc_screen.x / w[0]+bc_screen.y / w[1]+ bc_screen.z / w[2]));
 
             if (bc_screen.x < 0 || bc_screen.y < 0 || bc_screen.z < 0)
                 continue;
@@ -142,14 +162,12 @@ void triangle_tex(Vertex *verts, Texture *t)
             for(i32 i = 0; i < 3; ++i)
 			{
                 depth += (f32)verts[i].pos.z*bc_screen.elements[i];
-				tex_coords.x += verts[i].texcoord.x * (f32)bc_screen.elements[i];
-				tex_coords.y += verts[i].texcoord.y * (f32)bc_screen.elements[i];
-                //assert(verts[i].texcoord.y <= 1.f);
-                //assert(verts[i].texcoord.x <= 1.f);
+				tex_coords.x += verts[i].texcoord.x * (f32)bc_clip.elements[i];
+				tex_coords.y += verts[i].texcoord.y * (f32)bc_clip.elements[i];
             }
 			u32 index = P.x + P.y * rc.render_width;
             //if our pixel is closer than the zbuf's current, we render
-			vec4 col = t->data[(int)(tex_coords.x * t->texture_width) + (int)(tex_coords.y * (t->texture_height-1)*t->texture_width)];
+			vec4 col = t->data[(int)(tex_coords.x * t->texture_width) + (int)(tex_coords.y * t->texture_height)*t->texture_width];
 			//col = v4(random01(),0,random01(), 1);
 			if (rc.zbuf[index] > depth)
             //if (TRUE)
@@ -180,21 +198,7 @@ internal void init(void)
     rc.proj = perspective_proj(45.f,rc.render_width/ (f32)rc.render_height, 0.1f,100.f); 
 	tex = gen_sample_texture();
 }
-internal vec3 project_point(vec3 coords)
-{
-    vec4 local_coords = v4(coords.x, coords.y, coords.z, 1.f);
-    mat4 t = mat4_mul(mat4_translate(v3(0,0,0)), mat4_rotate(p.current_time *0, v3(0,1,0)));
-    vec4 ndc_coords = mat4_mulv(mat4_mul(rc.proj, mat4_mul(get_view_mat(&rc.cam),t)), local_coords);
-    //perspective divide??
-    ndc_coords.x /= ndc_coords.w;
-    ndc_coords.y /= ndc_coords.w;
-    ndc_coords.z /= ndc_coords.w;
-    ivec2 screen_coords = iv2(((ndc_coords.x + 1.f)/2) * rc.render_width, ((ndc_coords.y + 1.f)/2.f) * rc.render_height); 
-    vec4 wc = mat4_mulv(t, local_coords);
-	//ndc_coords.z = (ndc_coords.z+1)/2.f;
-    return (vec3){screen_coords.x, screen_coords.y, ndc_coords.z};
 
-}
 
 internal void update(f32 dt)
 {
@@ -215,7 +219,7 @@ internal void update(f32 dt)
 
 internal void render(void)
 {
-	rend_clear(&rc, v4(0.05,0.05,0.05,1));
+	rend_clear(&rc, v4(0.1,0.1,0.1,1));
 
     //here we transform all points from local coordinate -> global coords -> view coords -> NDC coords -> screen coords
     for (u32 i = 0; i < 36; i+=3)
@@ -230,9 +234,7 @@ internal void render(void)
         points[2] = project_point(points[2]);
 		*/
 		Vertex verts[3] = {cube_data[i], cube_data[i+1], cube_data[i+2]};
-		verts[0].pos = project_point(verts[0].pos);
-		verts[1].pos = project_point(verts[1].pos);
-		verts[2].pos = project_point(verts[2].pos);
+
 
         vec4 base_color = v4(0.7,0.3,0.3,1.f);
         f32 intensity = (i+10) / (f32)36;

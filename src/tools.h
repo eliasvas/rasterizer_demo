@@ -76,6 +76,12 @@ typedef char      b8;
 #ifdef CRTLESS | 1 
 #define offsetof2(type, member) ((unsigned int)((unsigned char*)&((type*)0)->member - (unsigned char*)0)) 
 #define SIGN(x) ((x < 0) ? -1 : (x > 0))
+
+INLINE f32 mix(f32 x, f32 y, f32 amount)
+{
+	assert(amount <= 1.f);
+	return x*amount + y* (1-amount);
+}
 INLINE i32 abs2(i32 x)
 {
   return x < 0 ? -x : x;
