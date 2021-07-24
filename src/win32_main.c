@@ -322,6 +322,8 @@ INT WINAPI WinMain(HINSTANCE Instance, HINSTANCE hPrevInstance,
 		
           while(!p.exit)
           {
+			  for (u32 key = 0; key < (int)KEY_MAX; ++key)
+				  p.key_pressed[key] = 0;
               MSG msg;
               while(PeekMessage(&msg, 0, 0, 0, PM_REMOVE))
               {

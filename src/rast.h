@@ -79,19 +79,28 @@ internal void rend_line(ivec2 t0, ivec2 t1, vec4 color)
     i32 derror = abs(dy)*2;
     i32 err = 0;
     i32 y = t0.y;
+	//TODO make this bullshit readable darn it
 	for (i32 x = t0.x; x <= t1.x; ++x)
 	{
+		u32 write = TRUE;
         u32 index;
         if (steep)
+		{
             index = y + x * rc.render_width;
-        else
+			if (x >= rc.render_height || y >= rc.render_width)write = FALSE;
+        }
+		else
+		{
             index = x + y * rc.render_width;
-        err += derror;
+			if (y >= rc.render_height || x >= rc.render_width)write = FALSE;
+        }
+		err += derror;
         if (err > dx)
         {
             y += (t1.y > t0.y ? 1 : -1);
             err -= dx*2;
         }
+		if (write != TRUE)continue;
 		rc.data[4 * index + 0] = color.elements[0];
 		rc.data[4 * index + 1] = color.elements[1];
 		rc.data[4 * index + 2] = color.elements[2];
@@ -224,29 +233,23 @@ internal void render(void)
     //here we transform all points from local coordinate -> global coords -> view coords -> NDC coords -> screen coords
     for (u32 i = 0; i < 36; i+=3)
     {
-		/*
-        vec3 points[3] = { (vec3){cube_data[i].pos.x, cube_data[i].pos.y,cube_data[i].pos.z},
-                             (vec3){cube_data[i+1].pos.x, cube_data[i+1].pos.y,cube_data[i+1].pos.z},
-                             (vec3){cube_data[i+2].pos.x, cube_data[i+2].pos.y,cube_data[i+2].pos.z}};
-
-        points[0] = project_point(points[0]);
-        points[1] = project_point(points[1]);
-        points[2] = project_point(points[2]);
-		*/
 		Vertex verts[3] = {cube_data[i], cube_data[i+1], cube_data[i+2]};
-
-
-        vec4 base_color = v4(0.7,0.3,0.3,1.f);
-        f32 intensity = (i+10) / (f32)36;
-        base_color = vec4_mulf(base_color, intensity);
 		
-
 		if (rc.render_mode == TRIANGLE_MODE)
 		{
 			//triangle(points, base_color);
-			triangle_tex(verts, &tex);
+			vec3 normal = vec3_cross(vec3_sub(verts[2].pos, verts[0].pos), vec3_sub(verts[1].pos, verts[0].pos));
+			normal = vec3_normalize(normal);
+			f32 light_intensity = vec3_dot(normal, light_dir);
+			if (light_intensity > 0.f)
+				triangle_tex(verts, &tex);
 		}else if (rc.render_mode == LINE_MODE)
 		{
+			vec4 base_color = v4(0.7,0.3,0.3,1.f);
+			f32 fake_w = 0;
+			verts[0].pos = project_point(verts[0].pos, &fake_w);
+			verts[1].pos = project_point(verts[1].pos, &fake_w);
+			verts[2].pos = project_point(verts[2].pos, &fake_w);
 			
 			rend_line(iv2(verts[0].pos.x,verts[0].pos.y), iv2(verts[1].pos.x,verts[1].pos.y), base_color);
 			rend_line(iv2(verts[1].pos.x,verts[1].pos.y), iv2(verts[2].pos.x,verts[2].pos.y), base_color);
