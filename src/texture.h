@@ -29,7 +29,7 @@ internal Texture gen_sample_texture(void)
 	{
 		for (u32 x = 0; x < tex.texture_width; ++x)
 		{
-			vec4 col = v4(1,1,1,1);
+			vec4 col = v4(0.3,0.7,0.8,1);
 			col = vec4_mulf(col, (((x/size_x + y/size_y) % 2 == 0)+0.5)/2.f);
             tex.data[x + y * tex.texture_width] = col;
 		}

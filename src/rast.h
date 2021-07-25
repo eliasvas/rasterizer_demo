@@ -33,7 +33,7 @@ typedef enum RenderSettings
 typedef struct RenderingContext
 {
 	u32 render_width, render_height;
-	f32 *data; //render_width * render_height * sizeof(f32) * 4
+	vec4 *data; //render_width * render_height * sizeof(f32) * 4
 	f32 *zbuf; //render_width * render_height * sizeof(f32)
 	b32 blend_func; //make the appropriate ENUM
     RenderMode render_mode;
@@ -53,10 +53,7 @@ internal void rend_clear(RenderingContext *rc, vec4 clear_color)
 	for (u32 i = 0; i < rc->render_width * rc->render_height; ++i)
 	{
 		//clear fbo color info
-		rc->data[4 * i + 0] = clear_color.elements[0];
-		rc->data[4 * i + 1] = clear_color.elements[1];
-		rc->data[4 * i + 2] = clear_color.elements[2];
-		rc->data[4 * i + 3] = clear_color.elements[3];
+		rc->data[i] = clear_color;
 		//clear fbo depth info
 		rc->zbuf[i] = 1.f;
 	}
@@ -101,10 +98,7 @@ internal void rend_line(ivec2 t0, ivec2 t1, vec4 color)
             err -= dx*2;
         }
 		if (write != TRUE)continue;
-		rc.data[4 * index + 0] = color.elements[0];
-		rc.data[4 * index + 1] = color.elements[1];
-		rc.data[4 * index + 2] = color.elements[2];
-		rc.data[4 * index + 3] = color.elements[3];
+		rc.data[index] = color;
 	}
 }
 
@@ -177,15 +171,10 @@ void triangle_tex(Vertex *verts, Texture *t)
 			u32 index = P.x + P.y * rc.render_width;
             //if our pixel is closer than the zbuf's current, we render
 			vec4 col = t->data[(int)(tex_coords.x * t->texture_width) + (int)(tex_coords.y * t->texture_height)*t->texture_width];
-			//col = v4(random01(),0,random01(), 1);
 			if (rc.zbuf[index] > depth)
-            //if (TRUE)
             {
                 rc.zbuf[index] = depth;
-                rc.data[4 * index + 0] = col.x;
-                rc.data[4 * index + 1] = col.y;
-                rc.data[4 * index + 2] = col.z;
-                rc.data[4 * index + 3] = col.w;
+                rc.data[index] = col;
             }
 
         }
@@ -198,7 +187,7 @@ internal void init(void)
 	rc = (RenderingContext){0};
 	rc.render_width = p.window_width;
 	rc.render_height = p.window_height;
-	rc.data = (f32*)malloc(sizeof(vec4) * rc.render_width * rc.render_height);
+	rc.data = (vec4*)malloc(sizeof(vec4) * rc.render_width * rc.render_height);
 	rc.zbuf = (f32*)malloc(sizeof(f32) * rc.render_width * rc.render_height);
 	rc.blend_func = FALSE; //no blending!
 	rc.render_mode = TRIANGLE_MODE;

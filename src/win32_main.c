@@ -263,9 +263,9 @@ render_main_fbo(win32_offscreen_buffer *buf)
 		u32 *pixel = (u32 *) row;
 		for(i32 X=0; X < buf->width; ++X)
 		{	
-			u8 Red = minimum((u32)255, (u32)(rc.data[4 * (Y*rc.render_width + X) + 0] * 255.f));
-			u8 Green = minimum((u32)255,(u32)(rc.data[4 * (Y*rc.render_width + X) + 1] * 255.f));
-			u8 Blue = minimum((u32)255,(u32)(rc.data[4 * (Y*rc.render_width + X) + 2] * 255.f));
+			u8 Red = minimum((u32)255, (u32)(rc.data[(Y*rc.render_width + X)].x * 255.f));
+			u8 Green = minimum((u32)255,(u32)(rc.data[(Y*rc.render_width + X)].y * 255.f));
+			u8 Blue = minimum((u32)255,(u32)(rc.data[(Y*rc.render_width + X)].z * 255.f));
 			*pixel++ = ((Red << 16) | ((Green << 8) | Blue));
 		}
 		row = row + buf->pitch;
