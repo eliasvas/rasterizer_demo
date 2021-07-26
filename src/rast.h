@@ -13,7 +13,7 @@
 	
 	-replace cstdlib functions (sin,tan...)
 */
-
+#define TEXTURE_SAMPLERS_COUNT 8
 extern Platform p;
 
 typedef enum RenderMode
@@ -42,11 +42,57 @@ typedef struct RenderingContext
 	Camera cam;
 	mat4 proj;
 }RenderingContext;
+global RenderingContext rc;
+global Texture tex;
+
+typedef struct Shader
+{
+	//here we put every variable that's ever needed
+	vec4 ndc_coords;
+	vec3 screen_coords;
+	Texture *texture_samplers[TEXTURE_SAMPLERS_COUNT];
+	vec4 (*vertex)(vec3 coords);
+	vec4 (*fragment)(vec2 tex_coords, Texture *t);
+}Shader;
+
+
+global Shader s;
+
+
+vec4 base_vertex(vec3 coords)
+{
+	vec4 local_coords = v4(coords.x, coords.y, coords.z, 1.f);
+    mat4 t = mat4_mul(mat4_translate(v3(0,0,0)), mat4_rotate(p.current_time *0, v3(0,1,0)));
+    vec4 ndc_coords = mat4_mulv(mat4_mul(rc.proj, mat4_mul(get_view_mat(&rc.cam),t)), local_coords);
+    //perspective divide??
+    ndc_coords.x /= ndc_coords.w;
+    ndc_coords.y /= ndc_coords.w;
+    ndc_coords.z /= ndc_coords.w;
+    ivec2 screen_coords = iv2(((ndc_coords.x + 1.f)/2) * rc.render_width, ((ndc_coords.y + 1.f)/2.f) * rc.render_height); 
+    vec4 wc = mat4_mulv(t, local_coords);
+	//ndc_coords.z = (ndc_coords.z+1)/2.f;
+    return (vec4){screen_coords.x, screen_coords.y, ndc_coords.z, ndc_coords.w};
+}
+
+vec4 base_fragment(vec2 tex_coords, Texture *t)
+{
+	vec4 col = t->data[(int)(tex_coords.x * t->texture_width) + (int)(tex_coords.y * t->texture_height)*t->texture_width];
+	return col;
+}
+
+internal Shader shader_default(void)
+{
+	Shader shad;
+	shad.vertex = base_vertex;
+	shad.fragment = base_fragment;
+	shad.texture_samplers[0] = &tex;
+	return shad;
+}
 
 vec3 light_dir = {0.2f, 0.5f, -1.f};
 
-global RenderingContext rc;
-Texture tex;
+
+
 
 internal void rend_clear(RenderingContext *rc, vec4 clear_color)
 {
@@ -126,12 +172,18 @@ internal vec3 project_point(vec3 coords, f32 *w)
     return (vec3){screen_coords.x, screen_coords.y, ndc_coords.z};
 
 }
-void triangle_tex(Vertex *verts, Texture *t)
+void triangle(Vertex *verts,Shader *s)
 { 
 	f32 w[3]; //the w's from projection of the 3 points!
+	vec4 v0 = s->vertex(verts[0].pos);
+	vec4 v1 = s->vertex(verts[1].pos);
+	vec4 v2 = s->vertex(verts[2].pos);
 	verts[0].pos = project_point(verts[0].pos, &w[0]);
 	verts[1].pos = project_point(verts[1].pos, &w[1]);
 	verts[2].pos = project_point(verts[2].pos, &w[2]);
+	//verts[0].pos = (vec3){v0.x,v0.y,v0.z};
+	verts[1].pos = v3(v1.x,v1.y,v1.z);
+	//verts[2].pos = v3(v2.x,v2.y,v2.z);
     ivec2 bboxmin = iv2(rc.render_width-1, rc.render_height-1);
     ivec2 bboxmax = iv2(0,0);
     ivec2 clamp = iv2(rc.render_width-1, rc.render_height-1);
@@ -160,7 +212,7 @@ void triangle_tex(Vertex *verts, Texture *t)
                 continue;
             //if it is we paint!
             depth = 0;
-			vec2 tex_coords = v2(0,0);
+			vec2 tex_coords = {0,0};
             //we find the real depth through interpolation!!
             for(i32 i = 0; i < 3; ++i)
 			{
@@ -169,8 +221,7 @@ void triangle_tex(Vertex *verts, Texture *t)
 				tex_coords.y += verts[i].texcoord.y * (f32)bc_clip.elements[i];
             }
 			u32 index = P.x + P.y * rc.render_width;
-            //if our pixel is closer than the zbuf's current, we render
-			vec4 col = t->data[(int)(tex_coords.x * t->texture_width) + (int)(tex_coords.y * t->texture_height)*t->texture_width];
+			vec4 col = s->fragment(tex_coords, s->texture_samplers[0]);
 			if (rc.zbuf[index] > depth)
             {
                 rc.zbuf[index] = depth;
@@ -195,6 +246,7 @@ internal void init(void)
     camera_init(&rc.cam);
     rc.proj = perspective_proj(45.f,rc.render_width/ (f32)rc.render_height, 0.1f,100.f); 
 	tex = gen_sample_texture();
+	s = shader_default();
 }
 
 
@@ -231,7 +283,7 @@ internal void render(void)
 			normal = vec3_normalize(normal);
 			f32 light_intensity = vec3_dot(normal, light_dir);
 			if (light_intensity > 0.f)
-				triangle_tex(verts, &tex);
+				triangle(verts, &s);
 		}else if (rc.render_mode == LINE_MODE)
 		{
 			vec4 base_color = v4(0.7,0.3,0.3,1.f);
@@ -245,5 +297,19 @@ internal void render(void)
 			rend_line(iv2(verts[2].pos.x,verts[2].pos.y), iv2(verts[0].pos.x,verts[0].pos.y), base_color);
 		}
     }
+	/*
+	//we render the coordinate system!
+	vec4 base_color = v4(0.7,0.3,0.3,1.f);
+	f32 fake_w = 0;
+	vec3 x_min = project_point(v3(-1000,0,0), &fake_w);
+	vec3 x_max = project_point(v3(1000,0,0), &fake_w);
+	vec3 y_min = project_point(v3(0,-1000,0), &fake_w);
+	vec3 y_max = project_point(v3(0,1000,0), &fake_w);
+	vec3 z_min = project_point(v3(0,0,-1000), &fake_w);
+	vec3 z_max = project_point(v3(0,0,1000), &fake_w);	
+	rend_line(iv2(x_min.x,x_min.y), iv2(x_max.x,x_max.y), base_color);
+	rend_line(iv2(y_min.x,y_min.y), iv2(y_max.x,y_max.y), base_color);
+	rend_line(iv2(z_min.x,z_min.y), iv2(z_max.x,z_max.y), base_color);
+	*/
 }
 #endif
