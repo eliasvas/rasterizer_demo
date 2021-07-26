@@ -174,16 +174,12 @@ internal vec3 project_point(vec3 coords, f32 *w)
 }
 void triangle(Vertex *verts,Shader *s)
 { 
-	f32 w[3]; //the w's from projection of the 3 points!
 	vec4 v0 = s->vertex(verts[0].pos);
 	vec4 v1 = s->vertex(verts[1].pos);
 	vec4 v2 = s->vertex(verts[2].pos);
-	verts[0].pos = project_point(verts[0].pos, &w[0]);
-	verts[1].pos = project_point(verts[1].pos, &w[1]);
-	verts[2].pos = project_point(verts[2].pos, &w[2]);
-	//verts[0].pos = (vec3){v0.x,v0.y,v0.z};
+	verts[0].pos = (vec3){v0.x,v0.y,v0.z};
 	verts[1].pos = v3(v1.x,v1.y,v1.z);
-	//verts[2].pos = v3(v2.x,v2.y,v2.z);
+	verts[2].pos = v3(v2.x,v2.y,v2.z);
     ivec2 bboxmin = iv2(rc.render_width-1, rc.render_height-1);
     ivec2 bboxmax = iv2(0,0);
     ivec2 clamp = iv2(rc.render_width-1, rc.render_height-1);
@@ -205,8 +201,8 @@ void triangle(Vertex *verts,Shader *s)
             //we find if the point is in the trangle by testing barycentric coords
 			vec3 points[3] = {verts[0].pos,verts[1].pos,verts[2].pos};
             vec3 bc_screen = barycentric(points, P);
-            vec3 bc_clip = v3(bc_screen.x / w[0], bc_screen.y / w[1], bc_screen.z / w[2]);
-            bc_clip = vec3_mulf(bc_clip, 1.f / (bc_screen.x / w[0]+bc_screen.y / w[1]+ bc_screen.z / w[2]));
+            vec3 bc_clip = v3(bc_screen.x / v0.w, bc_screen.y / v1.w, bc_screen.z / v2.w);
+            bc_clip = vec3_mulf(bc_clip, 1.f / (bc_screen.x / v0.w+bc_screen.y / v1.w+ bc_screen.z /v2.w));
 
             if (bc_screen.x < 0 || bc_screen.y < 0 || bc_screen.z < 0)
                 continue;
